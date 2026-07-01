@@ -1,21 +1,34 @@
 "use client";
 
 import { useRef, useEffect, useState, useCallback } from "react";
-import PolaroidFrame from "./PolaroidFrame";
 
 interface ViewfinderScreenProps {
   onCapture: (imageData: string) => void;
   onBack: () => void;
 }
 
+const FRAME_W = 1074;
+const FRAME_H = 1662;
+const CUTOUT_X = 60;
+const CUTOUT_Y = 60;
+const CUTOUT_W = 954;
+const CUTOUT_H = 1248;
+
 export default function ViewfinderScreen({ onCapture, onBack }: ViewfinderScreenProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const frameImgRef = useRef<HTMLImageElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [flash, setFlash] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
+
+  useEffect(() => {
+    const img = new Image();
+    img.src = "/frame-overlay.png";
+    img.onload = () => { frameImgRef.current = img; };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,55 +69,38 @@ export default function ViewfinderScreen({ onCapture, onBack }: ViewfinderScreen
   const capturePhoto = useCallback(() => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    if (!video || !canvas) return;
+    const frameImg = frameImgRef.current;
+    if (!video || !canvas || !frameImg) return;
 
     const vw = video.videoWidth;
     const vh = video.videoHeight;
 
-    const frameAspect = 3 / 4;
+    const cutoutAspect = CUTOUT_W / CUTOUT_H;
     let cropW: number, cropH: number;
-    if (vw / vh > frameAspect) {
+    if (vw / vh > cutoutAspect) {
       cropH = vh;
-      cropW = vh * frameAspect;
+      cropW = vh * cutoutAspect;
     } else {
       cropW = vw;
-      cropH = vw / frameAspect;
+      cropH = vw / cutoutAspect;
     }
     const sx = (vw - cropW) / 2;
     const sy = (vh - cropH) / 2;
 
-    const outputW = 1080;
-    const outputH = 1440;
-    const borderSide = 36;
-    const borderTop = 36;
-    const borderBottom = 156;
-
-    canvas.width = outputW + borderSide * 2;
-    canvas.height = outputH + borderTop + borderBottom;
-
+    canvas.width = FRAME_W;
+    canvas.height = FRAME_H;
     const ctx = canvas.getContext("2d")!;
 
-    ctx.shadowColor = "rgba(0,0,0,0.2)";
-    ctx.shadowBlur = 20;
-    ctx.shadowOffsetY = 4;
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.shadowColor = "transparent";
+    ctx.fillRect(0, 0, FRAME_W, FRAME_H);
 
     ctx.save();
-    ctx.translate(borderSide + outputW, borderTop);
+    ctx.translate(CUTOUT_X + CUTOUT_W, CUTOUT_Y);
     ctx.scale(-1, 1);
-    ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, outputW, outputH);
+    ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, CUTOUT_W, CUTOUT_H);
     ctx.restore();
 
-    const textY = outputH + borderTop + borderBottom / 2 + 8;
-    ctx.fillStyle = "#888888";
-    ctx.font = "500 28px Arial, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("Happy Canada Day 🍁", canvas.width / 2, textY);
-
-    drawMapleLeaf(ctx, canvas.width / 2 - 140, textY - 20, 18, "rgba(216,6,33,0.5)");
-    drawMapleLeaf(ctx, canvas.width / 2 + 122, textY - 20, 18, "rgba(216,6,33,0.5)");
+    ctx.drawImage(frameImg, 0, 0, FRAME_W, FRAME_H);
 
     const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
     onCapture(dataUrl);
@@ -133,7 +129,7 @@ export default function ViewfinderScreen({ onCapture, onBack }: ViewfinderScreen
 
   if (cameraError) {
     return (
-      <div className="h-full flex flex-col items-center justify-center bg-gray-900 text-white px-8 text-center">
+      <div className="h-full flex flex-col items-center justify-center bg-canada-red text-white px-8 text-center">
         <p className="text-5xl mb-6">📷</p>
         <p className="text-lg mb-6">{cameraError}</p>
         <button
@@ -147,12 +143,25 @@ export default function ViewfinderScreen({ onCapture, onBack }: ViewfinderScreen
   }
 
   return (
-    <div className="h-full flex flex-col bg-gray-900 relative">
+    <div className="h-full flex flex-col bg-canada-red relative">
       <canvas ref={canvasRef} className="hidden" />
 
-      <div className="flex-1 flex items-center justify-center p-4 pb-0">
-        <PolaroidFrame className="w-full max-w-[340px]">
-          <div className="relative aspect-[3/4] bg-gray-800">
+      {/* Frame + camera area */}
+      <div className="flex-1 flex items-center justify-center px-4 pt-4 pb-2">
+        <div
+          className="relative w-full max-w-[340px]"
+          style={{ aspectRatio: `${FRAME_W} / ${FRAME_H}` }}
+        >
+          {/* Camera feed behind the frame */}
+          <div
+            className="absolute bg-gray-800 overflow-hidden"
+            style={{
+              left: `${(CUTOUT_X / FRAME_W) * 100}%`,
+              top: `${(CUTOUT_Y / FRAME_H) * 100}%`,
+              width: `${(CUTOUT_W / FRAME_W) * 100}%`,
+              height: `${(CUTOUT_H / FRAME_H) * 100}%`,
+            }}
+          >
             <video
               ref={videoRef}
               autoPlay
@@ -176,13 +185,22 @@ export default function ViewfinderScreen({ onCapture, onBack }: ViewfinderScreen
               </div>
             )}
           </div>
-        </PolaroidFrame>
+
+          {/* Frame overlay */}
+          <img
+            src="/frame-overlay.png"
+            alt=""
+            className="absolute inset-0 w-full h-full pointer-events-none"
+            draggable={false}
+          />
+        </div>
       </div>
 
+      {/* Controls */}
       <div className="flex items-center justify-center py-6 gap-6">
         <button
           onClick={onBack}
-          className="w-12 h-12 rounded-full bg-white/20 text-white flex items-center justify-center text-xl"
+          className="w-12 h-12 rounded-full bg-canada-red-dark text-white flex items-center justify-center text-xl font-bold"
           aria-label="Go back"
         >
           ✕
@@ -190,10 +208,10 @@ export default function ViewfinderScreen({ onCapture, onBack }: ViewfinderScreen
         <button
           onClick={handleShutter}
           disabled={!cameraReady || countdown !== null}
-          className="w-20 h-20 rounded-full bg-white border-4 border-canada-red flex items-center justify-center active:scale-90 transition-transform disabled:opacity-50"
+          className="w-20 h-20 rounded-full bg-canada-red-dark flex items-center justify-center active:scale-90 transition-transform disabled:opacity-50"
           aria-label="Take photo"
         >
-          <div className="w-16 h-16 rounded-full bg-canada-red" />
+          <div className="w-[66px] h-[66px] rounded-full border-4 border-white" />
         </button>
         <div className="w-12 h-12" />
       </div>
@@ -203,49 +221,4 @@ export default function ViewfinderScreen({ onCapture, onBack }: ViewfinderScreen
       )}
     </div>
   );
-}
-
-function drawMapleLeaf(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  size: number,
-  color: string
-) {
-  ctx.save();
-  ctx.fillStyle = color;
-  ctx.translate(x, y);
-  const s = size / 50;
-  ctx.scale(s, s);
-  ctx.beginPath();
-  ctx.moveTo(50, 3);
-  ctx.lineTo(54, 18);
-  ctx.lineTo(63, 10);
-  ctx.lineTo(60, 25);
-  ctx.lineTo(75, 20);
-  ctx.lineTo(65, 32);
-  ctx.lineTo(80, 35);
-  ctx.lineTo(67, 40);
-  ctx.lineTo(82, 50);
-  ctx.lineTo(65, 48);
-  ctx.lineTo(72, 62);
-  ctx.lineTo(55, 52);
-  ctx.lineTo(55, 68);
-  ctx.lineTo(50, 58);
-  ctx.lineTo(45, 68);
-  ctx.lineTo(45, 52);
-  ctx.lineTo(28, 62);
-  ctx.lineTo(35, 48);
-  ctx.lineTo(18, 50);
-  ctx.lineTo(33, 40);
-  ctx.lineTo(20, 35);
-  ctx.lineTo(35, 32);
-  ctx.lineTo(25, 20);
-  ctx.lineTo(40, 25);
-  ctx.lineTo(37, 10);
-  ctx.lineTo(46, 18);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillRect(47, 65, 6, 20);
-  ctx.restore();
 }

@@ -8,13 +8,6 @@ interface ReviewScreenProps {
 }
 
 export default function ReviewScreen({ imageData, onRetake }: ReviewScreenProps) {
-  const handleSave = useCallback(() => {
-    const link = document.createElement("a");
-    link.href = imageData;
-    link.download = "canada-day-photo.jpg";
-    link.click();
-  }, [imageData]);
-
   const handleShare = useCallback(async () => {
     if (navigator.share) {
       try {
@@ -27,35 +20,37 @@ export default function ReviewScreen({ imageData, onRetake }: ReviewScreenProps)
         if (err instanceof Error && err.name === "AbortError") return;
       }
     }
-    handleSave();
-  }, [imageData, handleSave]);
+    const link = document.createElement("a");
+    link.href = imageData;
+    link.download = "canada-day-photo.jpg";
+    link.click();
+  }, [imageData]);
 
   return (
-    <div className="h-full flex flex-col bg-gray-900">
-      <div className="flex-1 flex items-center justify-center p-4 pb-0 overflow-hidden">
+    <div className="h-full flex flex-col bg-canada-red">
+      {/* Photo display */}
+      <div className="flex-1 flex items-center justify-center px-4 pt-4 pb-2 overflow-hidden">
         <img
           src={imageData}
           alt="Your Canada Day photo"
-          className="max-w-full max-h-full object-contain rounded-sm shadow-[0_4px_20px_rgba(0,0,0,0.3)]"
+          className="max-w-full max-h-full object-contain"
+          draggable={false}
         />
       </div>
 
-      <div className="flex items-center justify-center gap-4 py-6 px-4">
+      {/* Buttons */}
+      <div className="flex items-center justify-center gap-4 py-8 px-6">
         <button
           onClick={onRetake}
-          className="flex-1 max-w-[120px] bg-white/20 text-white font-semibold py-3 rounded-full text-center active:scale-95 transition-transform"
+          className="flex-1 max-w-[160px] bg-canada-red-dark text-white font-bold text-lg uppercase tracking-wider py-4 rounded-full active:scale-95 transition-transform"
+          style={{ fontFamily: "var(--font-poppins), sans-serif" }}
         >
           Retake
         </button>
         <button
-          onClick={handleSave}
-          className="flex-1 max-w-[120px] bg-white text-gray-900 font-semibold py-3 rounded-full text-center active:scale-95 transition-transform"
-        >
-          Save
-        </button>
-        <button
           onClick={handleShare}
-          className="flex-1 max-w-[120px] bg-canada-red text-white font-semibold py-3 rounded-full text-center active:scale-95 transition-transform"
+          className="flex-1 max-w-[160px] bg-white text-canada-red font-bold text-lg uppercase tracking-wider py-4 rounded-full active:scale-95 transition-transform"
+          style={{ fontFamily: "var(--font-poppins), sans-serif" }}
         >
           Share
         </button>
