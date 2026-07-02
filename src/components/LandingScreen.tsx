@@ -27,14 +27,9 @@ export default function LandingScreen({ onStart }: LandingScreenProps) {
         >
           Open Camera
         </button>
-
-        <img
-          src="/qr.png"
-          alt="QR code"
-          className="w-36 h-36 mt-8"
-          draggable={false}
-        />
       </div>
+
+      <div className="flex-1" />
 
       <div className="w-full relative z-10 mt-auto flex justify-center">
         <img
